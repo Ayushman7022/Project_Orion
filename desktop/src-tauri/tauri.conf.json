@@ -1,0 +1,30 @@
+{
+  "identifier": "com.orion.local",
+  "productName": "ORION",
+  "version": "0.1.0",
+  "build": {
+    "beforeDevCommand": "python -m http.server 1420 --bind 127.0.0.1 --directory C:\\Users\\Ayushman\\Desktop\\Sid\\frontend",
+    "beforeBuildCommand": "",
+    "frontendDist": "C:\\Users\\Ayushman\\Desktop\\Sid\\frontend",
+    "devUrl": "http://127.0.0.1:1420"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "ORION // Local Assistant",
+        "width": 1200,
+        "height": 760,
+        "resizable": true
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": false,
+    "targets": "all",
+    "icon": ["icons/icon.ico"]
+  }
+}
+

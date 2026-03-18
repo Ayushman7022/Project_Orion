@@ -1,0 +1,14 @@
+{
+  "name": "orion-desktop",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Orion desktop wrapper (Tauri) for Windows",
+  "scripts": {
+    "tauri:dev": "npm exec tauri -- dev",
+    "tauri:build": "npm exec tauri -- build"
+  },
+  "devDependencies": {
+    "@tauri-apps/cli": "^2.0.0"
+  }
+}
+

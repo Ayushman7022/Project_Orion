@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <title>NOVA // cognitive interface</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        /* Base styles will be in CSS file */
+    </style>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <!-- Dynamic background layers -->
+    <div class="ambient-bg">
+        <div class="gradient-sphere"></div>
+        <div class="grid-pattern"></div>
+        <div class="particle-field" id="particles"></div>
+        <div class="scan-line"></div>
+    </div>
+
+    <div class="app">
+        <!-- Top bar with system status -->
+        <header class="top-bar">
+            <div class="top-bar-left">
+                <div class="system-logo">
+                    <div class="logo-icon">
+                        <div class="pulse-ring"></div>
+                        <div class="core"></div>
+                    </div>
+                    <span class="logo-text">NOVA<span class="accent">//OS</span></span>
+                </div>
+                <div class="system-status">
+                    <span class="status-dot online"></span>
+                    <span class="status-text">QUANTUM CORE ONLINE</span>
+                </div>
+            </div>
+            <div class="top-bar-right">
+                <div class="system-time" id="current-time">22:47:03</div>
+                <div class="system-metrics">
+                    <div class="metric">
+                        <span class="metric-label">CPU</span>
+                        <span class="metric-value">23%</span>
+                    </div>
+                    <div class="metric">
+                        <span class="metric-label">RAM</span>
+                        <span class="metric-value">6.2G</span>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main dashboard -->
+        <div class="dashboard">
+            <!-- Left panel - Control center -->
+            <div class="panel left-panel">
+                <div class="panel-header">
+                    <h3 class="panel-title">
+                        <i data-lucide="cpu" size="18"></i>
+                        <span>NEURAL ENGINES</span>
+                    </h3>
+                </div>
+                
+                <div class="engine-cards">
+                    <div class="engine-card active">
+                        <div class="engine-icon">
+                            <i data-lucide="brain" size="24"></i>
+                        </div>
+                        <div class="engine-info">
+                            <div class="engine-name">LLAMA 3.1 8B</div>
+                            <div class="engine-status">
+                                <span class="status-badge">PRIMARY</span>
+                                <span class="engine-temp">42°C</span>
+                            </div>
+                        </div>
+                        <div class="engine-wave"></div>
+                    </div>
+                    
+                    <div class="engine-card">
+                        <div class="engine-icon">
+                            <i data-lucide="mic" size="24"></i>
+                        </div>
+                        <div class="engine-info">
+                            <div class="engine-name">WHISPER TURBO</div>
+                            <div class="engine-status">
+                                <span class="status-badge">LISTENING</span>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="engine-card">
+                        <div class="engine-icon">
+                            <i data-lucide="eye" size="24"></i>
+                        </div>
+                        <div class="engine-info">
+                            <div class="engine-name">NEURAL VISION</div>
+                            <div class="engine-status">
+                                <span class="status-badge standby">STANDBY</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="panel-header" style="margin-top: 1.5rem;">
+                    <h3 class="panel-title">
+                        <i data-lucide="key" size="18"></i>
+                        <span>SECURE VAULT</span>
+                    </h3>
+                </div>
+
+                <div class="vault-section">
+                    <div class="input-group">
+                        <input type="password" id="sarvam-key-input" placeholder="SARVAM API KEY" class="vault-input">
+                        <button id="save-keys-btn" class="vault-save">SAVE</button>
+                    </div>
+                    <div class="input-group">
+                        <input type="password" id="openai-key-input" placeholder="OPENAI API KEY" class="vault-input">
+                    </div>
+                    <div class="input-group">
+                        <input type="text" id="openai-model-input" value="gpt-4o-mini" placeholder="MODEL" class="vault-input">
+                    </div>
+                    <div class="vault-status">● SECURE CONNECTION</div>
+                </div>
+
+                <div class="system-slider">
+                    <div class="slider-label">
+                        <span>QUANTUM ALLOCATION</span>
+                        <span>68%</span>
+                    </div>
+                    <div class="slider-track">
+                        <div class="slider-fill" style="width: 68%"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Center panel - Main interface -->
+            <div class="panel center-panel">
+                <div class="consciousness-core">
+                    <div class="core-visualization">
+                        <div class="core-ring ring-1"></div>
+                        <div class="core-ring ring-2"></div>
+                        <div class="core-ring ring-3"></div>
+                        <div class="core-center"></div>
+                    </div>
+                    <div class="core-status" id="orion-state-pill">AWAITING INPUT</div>
+                    <div class="core-quote" id="live-transcript">"consciousness initialized"</div>
+                </div>
+
+                <div class="input-container">
+                    <textarea id="user-input" placeholder="Type your message..." rows="1"></textarea>
+                    <div class="input-actions">
+                        <button class="action-btn" id="mic-btn">
+                            <i data-lucide="mic" size="20"></i>
+                        </button>
+                        <button class="action-btn primary" id="send-btn">
+                            <i data-lucide="send" size="20"></i>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="image-panel" id="image-panel">
+                    <div class="image-status" id="image-status">No image yet</div>
+                    <img id="generated-image" class="generated-image" alt="Generated" />
+                </div>
+
+                <div class="quick-controls">
+                    <select class="control-select" id="language-select">
+                        <option value="en">ENGLISH</option>
+                        <option value="hi">हिन्दी</option>
+                        <option value="mr">मराठी</option>
+                    </select>
+                    <button class="control-btn" id="stt-mode">SARVAM STT</button>
+                </div>
+            </div>
+
+            <!-- Right panel - Event log -->
+            <div class="panel right-panel">
+                <div class="panel-header">
+                    <h3 class="panel-title">
+                        <i data-lucide="terminal" size="18"></i>
+                        <span>EVENT LOG</span>
+                    </h3>
+                    <button class="clear-btn" id="clear-feed">
+                        <i data-lucide="x" size="14"></i>
+                    </button>
+                </div>
+
+                <div class="log-container" id="chat-window">
+                    <div class="log-entry system">
+                        <span class="log-time">22:47:01</span>
+                        <span class="log-message">Neural core initialized</span>
+                    </div>
+                    <div class="log-entry user">
+                        <span class="log-time">22:47:05</span>
+                        <span class="log-message">System check</span>
+                    </div>
+                    <div class="log-entry ai">
+                        <span class="log-time">22:47:06</span>
+                        <span class="log-message">All systems operational. Quantum coherence at 99.97%</span>
+                    </div>
+                </div>
+
+                <div class="module-toggles">
+                    <div class="toggle-item">
+                        <span>WEB ACCESS</span>
+                        <label class="toggle">
+                            <input type="checkbox" checked>
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                    <div class="toggle-item">
+                        <span>FILE SYSTEM</span>
+                        <label class="toggle">
+                            <input type="checkbox" checked>
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                    <div class="toggle-item">
+                        <span>AUTO TERMINAL</span>
+                        <label class="toggle">
+                            <input type="checkbox">
+                            <span class="toggle-slider"></span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>
