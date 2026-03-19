@@ -11,3 +11,5 @@ python-multipart>=0.0.9
 aiofiles>=23.0.0
 python-dotenv>=1.0.1
 sarvamai>=0.1.0
+pycaw
+comtypes

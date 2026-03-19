@@ -2,234 +2,1885 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8" />
-    <title>NOVA // cognitive interface</title>
+    <title>ORION // neural interface</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Reduce stale CSS in Tauri WebView2 (desktop) -->
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    
     <!-- Fonts -->
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
     <!-- Icons -->
     <script src="https://unpkg.com/lucide@latest"></script>
-    <style>
-        /* Base styles will be in CSS file */
+    
+    <!-- Critical layout: keeps 3-column shell if external CSS fails to load (Tauri/file:// edge cases) -->
+    <style id="orion-layout-shell">
+      /* !important: WebView2 sometimes applies UA or cached CSS that fights layout */
+      html, body { height: 100%; margin: 0; }
+      .orion-interface {
+        box-sizing: border-box;
+        min-height: 100vh;
+        display: flex !important;
+        flex-direction: column !important;
+        padding: 16px;
+        gap: 16px;
+      }
+      .command-center {
+        flex: 1 1 auto !important;
+        min-height: 0;
+        display: flex !important;
+        flex-direction: row !important;
+        flex-wrap: nowrap !important;
+        align-items: stretch !important;
+        gap: 16px;
+        width: 100%;
+      }
+      .command-center > .hemisphere.left-hemisphere {
+        flex: 0 0 320px !important;
+        max-width: 380px;
+        min-width: 240px;
+        overflow: auto;
+      }
+      .command-center > .hemisphere.center-hemisphere {
+        flex: 1 1 0 !important;
+        min-width: 0 !important;
+        overflow: auto;
+      }
+      .command-center > .hemisphere.right-hemisphere {
+        flex: 0 0 320px !important;
+        max-width: 380px;
+        min-width: 240px;
+        overflow: auto;
+      }
+      .neural-bar {
+        display: flex !important;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        width: 100%;
+      }
     </style>
-    <link rel="stylesheet" href="styles.css">
+    <!-- Inline CSS (single-file frontend) -->
+    <style id="orion-theme-inline">
+/* Reset and base */
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+:root {
+  --bg-deep: #0a0c14;
+  --bg-surface: rgba(18, 22, 36, 0.6);
+  --accent-primary: #00f0ff;
+  --accent-secondary: #b86eff;
+  --accent-tertiary: #ff5e8a;
+  --text-primary: #f0f5ff;
+  --text-secondary: #9bb8ff;
+  --border-glow: rgba(0, 240, 255, 0.2);
+  --shadow-color: rgba(0, 180, 255, 0.3);
+}
+
+html {
+  height: 100%;
+}
+
+body {
+  font-family: 'Inter', sans-serif;
+  background: var(--bg-deep);
+  color: var(--text-primary);
+  min-height: 100%;
+  height: 100vh;
+  overflow: hidden;
+  position: relative;
+}
+
+/* Quantum background layers */
+.quantum-void {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+}
+
+.void-layer {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 50% 50%, #1a1f30 0%, #0a0c14 100%);
+}
+
+.nebula-field {
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(circle at 70% 30%, rgba(100, 0, 255, 0.1) 0%, transparent 50%),
+              radial-gradient(circle at 30% 70%, rgba(0, 240, 255, 0.1) 0%, transparent 50%);
+  filter: blur(40px);
+  animation: nebulaDrift 20s ease-in-out infinite;
+}
+
+.particle-network {
+  position: absolute;
+  inset: 0;
+  background-image: 
+    radial-gradient(circle at 10% 20%, rgba(0, 240, 255, 0.1) 1px, transparent 1px),
+    radial-gradient(circle at 90% 80%, rgba(184, 110, 255, 0.1) 1px, transparent 1px);
+  background-size: 100px 100px;
+}
+
+.energy-grid {
+  position: absolute;
+  inset: 0;
+  background-image: 
+    linear-gradient(rgba(0, 240, 255, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 240, 255, 0.02) 1px, transparent 1px);
+  background-size: 40px 40px;
+}
+
+.pulse-wave {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(transparent 50%, rgba(0, 240, 255, 0.01) 50%);
+  background-size: 100% 8px;
+  animation: pulseScan 15s linear infinite;
+}
+
+@keyframes nebulaDrift {
+  0%, 100% { transform: scale(1) translate(0, 0); }
+  50% { transform: scale(1.1) translate(-2%, -2%); }
+}
+
+@keyframes pulseScan {
+  0% { transform: translateY(-100%); }
+  100% { transform: translateY(200%); }
+}
+
+/* Main interface */
+.orion-interface {
+  position: relative;
+  z-index: 10;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  padding: 16px;
+  gap: 16px;
+}
+
+/* Neural bar */
+.neural-bar {
+  background: rgba(10, 14, 23, 0.7);
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--border-glow);
+  border-radius: 24px;
+  padding: 12px 24px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  box-shadow: 0 15px 35px -15px rgba(0, 0, 0, 0.8);
+}
+
+.bar-left {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.orion-symbol {
+  position: relative;
+  width: 40px;
+  height: 40px;
+}
+
+.quantum-ring {
+  position: absolute;
+  inset: 0;
+  border: 2px solid transparent;
+  border-top-color: var(--accent-primary);
+  border-bottom-color: var(--accent-secondary);
+  border-radius: 50%;
+  animation: quantumSpin 4s linear infinite;
+}
+
+.quantum-ring.inner {
+  inset: 8px;
+  border-top-color: var(--accent-secondary);
+  border-bottom-color: var(--accent-primary);
+  border-left-color: transparent;
+  border-right-color: transparent;
+  animation-direction: reverse;
+  animation-duration: 3s;
+}
+
+.singularity {
+  position: absolute;
+  inset: 12px;
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+  border-radius: 50%;
+  box-shadow: 0 0 20px var(--accent-primary);
+  animation: singularityPulse 2s ease-in-out infinite;
+}
+
+.orion-name {
+  font-size: 1.6rem;
+  font-weight: 700;
+  letter-spacing: 3px;
+  background: linear-gradient(135deg, #fff, #a0d0ff);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+.version {
+  font-size: 0.8rem;
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-left: 6px;
+  font-weight: 500;
+}
+
+.bar-center {
+  display: flex;
+  align-items: center;
+}
+
+.neural-status {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(0, 240, 255, 0.05);
+  padding: 6px 16px;
+  border-radius: 30px;
+  border: 1px solid rgba(0, 240, 255, 0.2);
+}
+
+.status-indicator {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  position: relative;
+}
+
+.status-indicator.active {
+  background: #00ff88;
+  box-shadow: 0 0 15px #00ff88;
+  animation: statusPulse 2s ease infinite;
+}
+
+.status-text {
+  font-size: 0.8rem;
+  font-weight: 600;
+  letter-spacing: 1.5px;
+  color: var(--text-secondary);
+}
+
+.bar-right {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+}
+
+.quantum-metrics {
+  display: flex;
+  gap: 15px;
+}
+
+.metric-chip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(0, 0, 0, 0.3);
+  padding: 4px 10px;
+  border-radius: 20px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.metric-label {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  opacity: 0.8;
+}
+
+.metric-value {
+  font-family: 'Space Grotesk', monospace;
+  font-weight: 600;
+  color: var(--accent-primary);
+  text-shadow: 0 0 5px var(--accent-primary);
+}
+
+.time-crystal {
+  font-family: 'Space Grotesk', monospace;
+  font-size: 1.3rem;
+  font-weight: 600;
+  color: var(--accent-primary);
+  text-shadow: 0 0 15px var(--accent-primary);
+  letter-spacing: 2px;
+}
+
+/* Command center: flex row (reliable in WebView2; avoids single-column fallback if grid mis-parses) */
+.command-center {
+  flex: 1;
+  display: flex;
+  flex-direction: row;
+  flex-wrap: nowrap;
+  align-items: stretch;
+  gap: 16px;
+  min-height: 0;
+}
+
+.command-center > .hemisphere.left-hemisphere {
+  flex: 0 0 320px;
+  max-width: 380px;
+  min-width: 240px;
+}
+
+.command-center > .hemisphere.center-hemisphere {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.command-center > .hemisphere.right-hemisphere {
+  flex: 0 0 320px;
+  max-width: 380px;
+  min-width: 240px;
+}
+
+/* Hemisphere panels */
+.hemisphere {
+  background: rgba(10, 14, 23, 0.6);
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--border-glow);
+  border-radius: 28px;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  overflow-y: auto;
+  box-shadow: 0 20px 40px -15px rgba(0, 0, 0, 0.7);
+  transition: all 0.3s ease;
+}
+
+.hemisphere:hover {
+  border-color: rgba(0, 240, 255, 0.3);
+  box-shadow: 0 20px 50px -15px var(--shadow-color);
+}
+
+/* Core modules */
+.core-module {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 20px;
+  padding: 16px;
+}
+
+.module-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 2px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+}
+
+.module-header i {
+  color: var(--accent-primary);
+}
+
+/* Processor stack */
+.processor-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.processor-unit {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 0;
+}
+
+.unit-info {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.9rem;
+}
+
+.unit-name {
+  color: var(--text-primary);
+}
+
+.unit-status {
+  font-size: 0.7rem;
+  padding: 2px 8px;
+  background: rgba(0, 240, 255, 0.15);
+  border-radius: 20px;
+  color: var(--accent-primary);
+  border: 1px solid rgba(0, 240, 255, 0.3);
+}
+
+.unit-status.standby {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-secondary);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.unit-bar {
+  height: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
+  border-radius: 4px;
+  box-shadow: 0 0 10px var(--accent-primary);
+  transition: width 0.3s ease;
+}
+
+/* Image receptor: in-flow in left column (HTML); compact preview */
+.left-hemisphere {
+  position: relative;
+}
+
+.image-receptor {
+  position: relative;
+  width: 100%;
+  max-width: 100%;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(0, 240, 255, 0.25);
+  border-radius: 16px;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  z-index: 1;
+  flex-shrink: 0;
+  min-height: 0;
+}
+
+.receptor-status {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  letter-spacing: 0.5px;
+}
+
+.neural-image {
+  width: 100%;
+  max-height: 150px;
+  object-fit: contain;
+  border-radius: 10px;
+  display: none;
+  background: rgba(0, 0, 0, 0.2);
+}
+
+.image-receptor.has-image {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 24px rgba(0, 240, 255, 0.2);
+}
+
+@media (max-width: 1100px) {
+  .neural-image {
+    max-height: 120px;
+  }
+}
+
+/* Stack only on very narrow viewports (avoid turning a normal desktop window into one tall column) */
+@media (max-width: 640px) {
+  .command-center {
+    flex-direction: column;
+    flex-wrap: nowrap;
+  }
+
+  .command-center > .hemisphere.left-hemisphere,
+  .command-center > .hemisphere.right-hemisphere {
+    flex: 1 1 auto;
+    max-width: none;
+    width: 100%;
+  }
+
+  .command-center > .hemisphere.center-hemisphere {
+    flex: 1 1 auto;
+    order: -1;
+  }
+}
+
+/* Vault container */
+.vault-container {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.key-field {
+  display: flex;
+  gap: 8px;
+}
+
+.vault-input {
+  flex: 1;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(0, 240, 255, 0.15);
+  border-radius: 12px;
+  padding: 10px 14px;
+  color: var(--text-primary);
+  font-family: 'Space Grotesk', monospace;
+  font-size: 0.85rem;
+  outline: none;
+  transition: all 0.3s;
+}
+
+.vault-input:focus {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 3px rgba(0, 240, 255, 0.1);
+}
+
+.vault-action {
+  background: rgba(0, 240, 255, 0.1);
+  border: 1px solid var(--accent-primary);
+  border-radius: 12px;
+  padding: 0 15px;
+  color: var(--text-primary);
+  font-weight: 600;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.vault-action:hover {
+  background: var(--accent-primary);
+  color: var(--bg-deep);
+  box-shadow: 0 0 20px var(--accent-primary);
+}
+
+.vault-shield {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.7rem;
+  color: #00ff88;
+  margin-top: 5px;
+}
+
+.shield-dot {
+  width: 8px;
+  height: 8px;
+  background: #00ff88;
+  border-radius: 50%;
+  box-shadow: 0 0 10px #00ff88;
+  animation: shieldPulse 2s infinite;
+}
+
+/* Quantum meter */
+.quantum-meter {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.meter-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.meter-track {
+  height: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.meter-progress {
+  height: 100%;
+  background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
+  border-radius: 6px;
+  box-shadow: 0 0 15px var(--accent-primary);
+  transition: width 0.3s ease;
+}
+
+/* Module toggles */
+.module-toggles {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.toggle-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 0;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 46px;
+  height: 24px;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-switch .toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 24px;
+  transition: 0.3s;
+}
+
+.toggle-switch .toggle-slider:before {
+  position: absolute;
+  content: "";
+  height: 18px;
+  width: 18px;
+  left: 3px;
+  bottom: 2px;
+  background: var(--text-secondary);
+  border-radius: 50%;
+  transition: 0.3s;
+}
+
+.toggle-switch input:checked + .toggle-slider {
+  background: linear-gradient(90deg, rgba(0, 240, 255, 0.15), rgba(184, 110, 255, 0.15));
+  border-color: var(--accent-primary);
+}
+
+.toggle-switch input:checked + .toggle-slider:before {
+  transform: translateX(22px);
+  background: var(--accent-primary);
+  box-shadow: 0 0 10px var(--accent-primary);
+}
+
+/* Center hemisphere */
+.center-hemisphere {
+  align-items: center;
+  justify-content: center;
+  gap: 25px;
+}
+
+.consciousness-core {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 20px;
+  width: 100%;
+}
+
+.core-visualization {
+  position: relative;
+  width: 280px;
+  height: 280px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.core-orbit {
+  position: absolute;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  animation: orbitSpin var(--speed) linear infinite;
+}
+
+.orbit-1 {
+  inset: 0;
+  border-top-color: var(--accent-primary);
+  border-bottom-color: var(--accent-secondary);
+  --speed: 10s;
+}
+
+.orbit-2 {
+  inset: 25px;
+  border-left-color: var(--accent-tertiary);
+  border-right-color: var(--accent-primary);
+  --speed: 7s;
+  animation-direction: reverse;
+}
+
+.orbit-3 {
+  inset: 50px;
+  border: 2px dashed rgba(0, 240, 255, 0.3);
+  --speed: 14s;
+}
+
+.orbit-4 {
+  inset: 75px;
+  border: 1px solid rgba(184, 110, 255, 0.3);
+  --speed: 18s;
+  animation-direction: reverse;
+}
+
+.core-singularity {
+  width: 100px;
+  height: 100px;
+  background: radial-gradient(circle at 30% 30%, 
+      var(--accent-primary) 0%,
+      var(--accent-secondary) 70%,
+      #000 100%);
+  border-radius: 50%;
+  box-shadow: 0 0 60px var(--accent-primary);
+  animation: singularityBreathe 3s ease-in-out infinite;
+}
+
+.core-pulse {
+  position: absolute;
+  width: 150px;
+  height: 150px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(0, 240, 255, 0.2) 0%, transparent 70%);
+  animation: pulseRing 3s ease-out infinite;
+}
+
+.core-state {
+  font-size: 0.9rem;
+  padding: 8px 28px;
+  background: rgba(0, 240, 255, 0.1);
+  border: 1px solid var(--accent-primary);
+  border-radius: 40px;
+  color: var(--accent-primary);
+  letter-spacing: 3px;
+  font-weight: 600;
+}
+
+.consciousness-stream {
+  font-size: 1.5rem;
+  font-weight: 300;
+  font-style: italic;
+  background: linear-gradient(135deg, #fff, var(--accent-primary));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  text-align: center;
+  max-width: 90%;
+  min-height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1.4;
+}
+
+/* Input matrix */
+.input-matrix {
+  width: 100%;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border-glow);
+  border-radius: 30px;
+  padding: 6px 6px 6px 20px;
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  transition: all 0.3s;
+}
+
+.input-matrix:focus-within {
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 30px rgba(0, 240, 255, 0.2);
+}
+
+.input-matrix textarea {
+  flex: 1;
+  background: transparent;
+  border: none;
+  color: var(--text-primary);
+  font-family: 'Inter', sans-serif;
+  font-size: 1rem;
+  resize: none;
+  outline: none;
+  padding: 12px 0;
+  max-height: 100px;
+}
+
+.matrix-actions {
+  display: flex;
+  gap: 6px;
+}
+
+.matrix-btn {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid var(--border-glow);
+  background: rgba(0, 0, 0, 0.3);
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+.matrix-btn:hover {
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+  transform: scale(1.1);
+}
+
+.matrix-btn.primary {
+  background: linear-gradient(135deg, 
+      rgba(0, 240, 255, 0.15) 0%,
+      rgba(184, 110, 255, 0.15) 100%);
+  border-color: var(--accent-primary);
+}
+
+.matrix-btn.primary:hover {
+  background: linear-gradient(135deg, 
+      var(--accent-primary) 0%,
+      var(--accent-secondary) 100%);
+  color: var(--bg-deep);
+  box-shadow: 0 0 30px var(--accent-primary);
+}
+
+/* Frequency controls */
+.frequency-controls {
+  display: flex;
+  gap: 10px;
+  width: 100%;
+  justify-content: center;
+}
+
+.frequency-select {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border-glow);
+  border-radius: 30px;
+  padding: 8px 18px;
+  color: var(--text-primary);
+  font-family: 'Inter', sans-serif;
+  font-size: 0.85rem;
+  cursor: pointer;
+  outline: none;
+  flex: 1;
+}
+
+.frequency-btn {
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border-glow);
+  border-radius: 30px;
+  padding: 8px 20px;
+  color: var(--text-primary);
+  font-family: 'Inter', sans-serif;
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s;
+  white-space: nowrap;
+}
+
+.frequency-btn:hover {
+  border-color: var(--accent-primary);
+  color: var(--accent-primary);
+  box-shadow: 0 0 20px rgba(0, 240, 255, 0.2);
+}
+
+/* Right hemisphere - Memory log */
+.log-stream {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-right: 5px;
+  max-height: calc(100vh - 300px);
+}
+
+.log-entry {
+  padding: 12px 16px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 16px;
+  border-left: 3px solid transparent;
+  font-size: 0.9rem;
+  display: flex;
+  gap: 12px;
+  transition: all 0.2s;
+}
+
+.log-entry.system {
+  border-left-color: var(--accent-primary);
+}
+
+.log-entry.user {
+  border-left-color: var(--accent-tertiary);
+}
+
+.log-entry.ai {
+  border-left-color: var(--accent-secondary);
+}
+
+.log-timestamp {
+  font-family: 'Space Grotesk', monospace;
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.log-message {
+  color: var(--text-primary);
+  word-break: break-word;
+}
+
+.clear-log {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-secondary);
+  cursor: pointer;
+  margin-left: auto;
+  transition: all 0.3s;
+}
+
+.clear-log:hover {
+  border-color: var(--accent-tertiary);
+  color: var(--accent-tertiary);
+}
+
+/* Quantum foam */
+.quantum-foam {
+  margin-top: auto;
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  padding: 15px 0 5px;
+}
+
+.foam-particle {
+  width: 4px;
+  height: 4px;
+  background: var(--accent-primary);
+  border-radius: 50%;
+  opacity: 0.3;
+  animation: foamFloat 3s ease-in-out infinite;
+}
+
+.foam-particle:nth-child(2) {
+  background: var(--accent-secondary);
+  animation-delay: 1s;
+}
+
+.foam-particle:nth-child(3) {
+  background: var(--accent-tertiary);
+  animation-delay: 2s;
+}
+
+/* Animations */
+@keyframes quantumSpin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes singularityPulse {
+  0%, 100% { transform: scale(1); opacity:0.8; }
+  50% { transform: scale(1.2); opacity: 1; }
+}
+
+@keyframes statusPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+@keyframes shieldPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.3; }
+}
+
+@keyframes orbitSpin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes singularityBreathe {
+  0%, 100% { transform: scale(1); opacity: 0.9; }
+  50% { transform: scale(1.1); opacity: 1; }
+}
+
+@keyframes pulseRing {
+  0% { transform: scale(0.8); opacity: 0.5; }
+  100% { transform: scale(1.5); opacity: 0; }
+}
+
+@keyframes foamFloat {
+  0%, 100% { transform: translateY(0); opacity: 0.3; }
+  50% { transform: translateY(-10px); opacity: 0.8; }
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 240, 255, 0.2);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 240, 255, 0.4);
+}
+
+/* Hidden utility */
+.hidden {
+  display: none !important;
+}
+    </style>
 </head>
 <body>
-    <!-- Dynamic background layers -->
-    <div class="ambient-bg">
-        <div class="gradient-sphere"></div>
-        <div class="grid-pattern"></div>
-        <div class="particle-field" id="particles"></div>
-        <div class="scan-line"></div>
+    <!-- Quantum background layers -->
+    <div class="quantum-void">
+        <div class="void-layer"></div>
+        <div class="nebula-field"></div>
+        <div class="particle-network" id="particles"></div>
+        <div class="energy-grid"></div>
+        <div class="pulse-wave"></div>
     </div>
 
-    <div class="app">
-        <!-- Top bar with system status -->
-        <header class="top-bar">
-            <div class="top-bar-left">
-                <div class="system-logo">
-                    <div class="logo-icon">
-                        <div class="pulse-ring"></div>
-                        <div class="core"></div>
-                    </div>
-                    <span class="logo-text">NOVA<span class="accent">//OS</span></span>
+    <div class="orion-interface">
+        <!-- Neural status bar -->
+        <header class="neural-bar">
+            <div class="bar-left">
+                <div class="orion-symbol">
+                    <div class="quantum-ring"></div>
+                    <div class="quantum-ring inner"></div>
+                    <div class="singularity"></div>
                 </div>
-                <div class="system-status">
-                    <span class="status-dot online"></span>
-                    <span class="status-text">QUANTUM CORE ONLINE</span>
+                <span class="orion-name">ORION<span class="version">//v.3.1.0</span></span>
+            </div>
+            
+            <div class="bar-center">
+                <div class="neural-status">
+                    <span class="status-indicator active"></span>
+                    <span class="status-text">NEURAL LINK ACTIVE</span>
                 </div>
             </div>
-            <div class="top-bar-right">
-                <div class="system-time" id="current-time">22:47:03</div>
-                <div class="system-metrics">
-                    <div class="metric">
-                        <span class="metric-label">CPU</span>
-                        <span class="metric-value">23%</span>
+            
+            <div class="bar-right">
+                <div class="quantum-metrics">
+                    <div class="metric-chip">
+                        <span class="metric-label">QT</span>
+                        <span class="metric-value">99.8%</span>
                     </div>
-                    <div class="metric">
-                        <span class="metric-label">RAM</span>
-                        <span class="metric-value">6.2G</span>
+                    <div class="metric-chip">
+                        <span class="metric-label">SYN</span>
+                        <span class="metric-value">1.4THz</span>
                     </div>
                 </div>
+                <div class="time-crystal" id="quantum-time">23:47:09</div>
             </div>
         </header>
 
-        <!-- Main dashboard -->
-        <div class="dashboard">
-            <!-- Left panel - Control center -->
-            <div class="panel left-panel">
-                <div class="panel-header">
-                    <h3 class="panel-title">
-                        <i data-lucide="cpu" size="18"></i>
-                        <span>NEURAL ENGINES</span>
-                    </h3>
-                </div>
-                
-                <div class="engine-cards">
-                    <div class="engine-card active">
-                        <div class="engine-icon">
-                            <i data-lucide="brain" size="24"></i>
-                        </div>
-                        <div class="engine-info">
-                            <div class="engine-name">LLAMA 3.1 8B</div>
-                            <div class="engine-status">
-                                <span class="status-badge">PRIMARY</span>
-                                <span class="engine-temp">42°C</span>
-                            </div>
-                        </div>
-                        <div class="engine-wave"></div>
+        <!-- Main command center -->
+        <div class="command-center">
+            <!-- Left hemisphere - System core with image receptor -->
+            <div class="hemisphere left-hemisphere">
+                <div class="core-module">
+                    <div class="module-header">
+                        <i data-lucide="cpu" size="16"></i>
+                        <span>NEURAL PROCESSORS</span>
                     </div>
                     
-                    <div class="engine-card">
-                        <div class="engine-icon">
-                            <i data-lucide="mic" size="24"></i>
-                        </div>
-                        <div class="engine-info">
-                            <div class="engine-name">WHISPER TURBO</div>
-                            <div class="engine-status">
-                                <span class="status-badge">LISTENING</span>
+                    <div class="processor-stack">
+                        <div class="processor-unit active">
+                            <div class="unit-info">
+                                <span class="unit-name">LLAMA 3.1 8B</span>
+                                <span class="unit-status">PRIME</span>
+                            </div>
+                            <div class="unit-bar">
+                                <div class="bar-fill" style="width: 78%"></div>
                             </div>
                         </div>
+                        
+                        <div class="processor-unit">
+                            <div class="unit-info">
+                                <span class="unit-name">SARVAM TURBO</span>
+                                <span class="unit-status">LISTEN</span>
+                            </div>
+                            <div class="unit-bar">
+                                <div class="bar-fill" style="width: 45%"></div>
+                            </div>
+                        </div>
+                        
+                        <div class="processor-unit">
+                            <div class="unit-info">
+                                <span class="unit-name">NEURAL VISION</span>
+                                <span class="unit-status standby">STANDBY</span>
+                            </div>
+                            <div class="unit-bar">
+                                <div class="bar-fill" style="width: 12%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Image receptor moved here - below processors -->
+                <div class="image-receptor" id="image-receptor">
+                    <div class="receptor-status" id="image-status">No visual input</div>
+                    <img id="generated-image" class="neural-image" alt="Neural visualization">
+                </div>
+
+                <div class="core-module">
+                    <div class="module-header">
+                        <i data-lucide="key" size="16"></i>
+                        <span>CRYPTOGRAPHIC VAULT</span>
                     </div>
                     
-                    <div class="engine-card">
-                        <div class="engine-icon">
-                            <i data-lucide="eye" size="24"></i>
+                    <div class="vault-container">
+                        <div class="key-field">
+                            <input type="password" id="sarvam-key" placeholder="SARVAM API KEY" class="vault-input">
+                            <button class="vault-action" id="save-sarvam">STORE</button>
                         </div>
-                        <div class="engine-info">
-                            <div class="engine-name">NEURAL VISION</div>
-                            <div class="engine-status">
-                                <span class="status-badge standby">STANDBY</span>
-                            </div>
+                        <div class="key-field">
+                            <input type="password" id="openai-key" placeholder="OPENAI API KEY" class="vault-input">
+                        </div>
+                        <div class="key-field">
+                            <input type="text" id="openai-model" value="gpt-4o" placeholder="MODEL" class="vault-input">
+                        </div>
+                        <div class="vault-shield">
+                            <span class="shield-dot"></span>
+                            <span>QUANTUM ENCRYPTED</span>
                         </div>
                     </div>
                 </div>
 
-                <div class="panel-header" style="margin-top: 1.5rem;">
-                    <h3 class="panel-title">
-                        <i data-lucide="key" size="18"></i>
-                        <span>SECURE VAULT</span>
-                    </h3>
-                </div>
-
-                <div class="vault-section">
-                    <div class="input-group">
-                        <input type="password" id="sarvam-key-input" placeholder="SARVAM API KEY" class="vault-input">
-                        <button id="save-keys-btn" class="vault-save">SAVE</button>
-                    </div>
-                    <div class="input-group">
-                        <input type="password" id="openai-key-input" placeholder="OPENAI API KEY" class="vault-input">
-                    </div>
-                    <div class="input-group">
-                        <input type="text" id="openai-model-input" value="gpt-4o-mini" placeholder="MODEL" class="vault-input">
-                    </div>
-                    <div class="vault-status">● SECURE CONNECTION</div>
-                </div>
-
-                <div class="system-slider">
-                    <div class="slider-label">
+                <div class="core-module">
+                    <div class="module-header">
+                        <i data-lucide="activity" size="16"></i>
                         <span>QUANTUM ALLOCATION</span>
-                        <span>68%</span>
                     </div>
-                    <div class="slider-track">
-                        <div class="slider-fill" style="width: 68%"></div>
+                    
+                    <div class="quantum-meter">
+                        <div class="meter-labels">
+                            <span>VRAM</span>
+                            <span>6.2 / 8 GB</span>
+                        </div>
+                        <div class="meter-track">
+                            <div class="meter-progress" style="width: 78%"></div>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Center panel - Main interface -->
-            <div class="panel center-panel">
+            <!-- Center hemisphere - Consciousness core -->
+            <div class="hemisphere center-hemisphere">
                 <div class="consciousness-core">
                     <div class="core-visualization">
-                        <div class="core-ring ring-1"></div>
-                        <div class="core-ring ring-2"></div>
-                        <div class="core-ring ring-3"></div>
-                        <div class="core-center"></div>
+                        <div class="core-orbit orbit-1"></div>
+                        <div class="core-orbit orbit-2"></div>
+                        <div class="core-orbit orbit-3"></div>
+                        <div class="core-orbit orbit-4"></div>
+                        <div class="core-singularity"></div>
+                        <div class="core-pulse"></div>
                     </div>
-                    <div class="core-status" id="orion-state-pill">AWAITING INPUT</div>
-                    <div class="core-quote" id="live-transcript">"consciousness initialized"</div>
+                    
+                    <div class="core-state" id="core-state">AWAITING INPUT</div>
+                    
+                    <div class="consciousness-stream" id="consciousness-stream">
+                        "neural pathways initialized"
+                    </div>
                 </div>
 
-                <div class="input-container">
-                    <textarea id="user-input" placeholder="Type your message..." rows="1"></textarea>
-                    <div class="input-actions">
-                        <button class="action-btn" id="mic-btn">
+                <div class="input-matrix">
+                    <textarea id="user-input" placeholder="Enter command or use neural interface..." rows="1"></textarea>
+                    <div class="matrix-actions">
+                        <button class="matrix-btn" id="mic-btn">
                             <i data-lucide="mic" size="20"></i>
                         </button>
-                        <button class="action-btn primary" id="send-btn">
+                        <button class="matrix-btn primary" id="send-btn">
                             <i data-lucide="send" size="20"></i>
                         </button>
                     </div>
                 </div>
 
-                <div class="image-panel" id="image-panel">
-                    <div class="image-status" id="image-status">No image yet</div>
-                    <img id="generated-image" class="generated-image" alt="Generated" />
-                </div>
-
-                <div class="quick-controls">
-                    <select class="control-select" id="language-select">
-                        <option value="en">ENGLISH</option>
-                        <option value="hi">हिन्दी</option>
-                        <option value="mr">मराठी</option>
+                <div class="frequency-controls">
+                    <select class="frequency-select" id="language-select">
+                        <option value="en">ENGLISH [42.7 MHz]</option>
+                        <option value="hi">हिन्दी [38.2 MHz]</option>
+                        <option value="mr">मराठी [35.9 MHz]</option>
                     </select>
-                    <button class="control-btn" id="stt-mode">SARVAM STT</button>
+                    <button class="frequency-btn" id="stt-mode">SARVAM PROTOCOL</button>
                 </div>
             </div>
 
-            <!-- Right panel - Event log -->
-            <div class="panel right-panel">
-                <div class="panel-header">
-                    <h3 class="panel-title">
-                        <i data-lucide="terminal" size="18"></i>
-                        <span>EVENT LOG</span>
-                    </h3>
-                    <button class="clear-btn" id="clear-feed">
+            <!-- Right hemisphere - Memory log -->
+            <div class="hemisphere right-hemisphere">
+                <div class="module-header">
+                    <i data-lucide="terminal" size="16"></i>
+                    <span>MEMORY LOG</span>
+                    <button class="clear-log" id="clear-log">
                         <i data-lucide="x" size="14"></i>
                     </button>
                 </div>
 
-                <div class="log-container" id="chat-window">
+                <div class="log-stream" id="log-stream">
                     <div class="log-entry system">
-                        <span class="log-time">22:47:01</span>
-                        <span class="log-message">Neural core initialized</span>
+                        <span class="log-timestamp">23:47:01</span>
+                        <span class="log-message">Neural core synchronization complete</span>
                     </div>
                     <div class="log-entry user">
-                        <span class="log-time">22:47:05</span>
-                        <span class="log-message">System check</span>
+                        <span class="log-timestamp">23:47:05</span>
+                        <span class="log-message">System diagnostic</span>
                     </div>
                     <div class="log-entry ai">
-                        <span class="log-time">22:47:06</span>
+                        <span class="log-timestamp">23:47:06</span>
                         <span class="log-message">All systems operational. Quantum coherence at 99.97%</span>
                     </div>
                 </div>
 
-                <div class="module-toggles">
-                    <div class="toggle-item">
-                        <span>WEB ACCESS</span>
-                        <label class="toggle">
-                            <input type="checkbox" checked>
-                            <span class="toggle-slider"></span>
-                        </label>
-                    </div>
-                    <div class="toggle-item">
-                        <span>FILE SYSTEM</span>
-                        <label class="toggle">
-                            <input type="checkbox" checked>
-                            <span class="toggle-slider"></span>
-                        </label>
-                    </div>
-                    <div class="toggle-item">
-                        <span>AUTO TERMINAL</span>
-                        <label class="toggle">
-                            <input type="checkbox">
-                            <span class="toggle-slider"></span>
-                        </label>
-                    </div>
+                <div class="quantum-foam">
+                    <div class="foam-particle"></div>
+                    <div class="foam-particle"></div>
+                    <div class="foam-particle"></div>
                 </div>
             </div>
         </div>
     </div>
 
-    <script src="app.js"></script>
+    <script>
+// Initialize Lucide icons
+lucide.createIcons();
+
+// ===== CONFIGURATION =====
+const API_BASE = "http://localhost:8000";
+
+// ===== DOM ELEMENTS (SIMPLIFIED - NO FALLBACKS TO NON-EXISTENT IDS) =====
+const elements = {
+    // Core elements
+    coreState: document.getElementById("core-state"),
+    consciousnessStream: document.getElementById("consciousness-stream"),
+    userInput: document.getElementById("user-input"),
+    sendBtn: document.getElementById("send-btn"),
+    micBtn: document.getElementById("mic-btn"),
+    clearLog: document.getElementById("clear-log"),
+    logStream: document.getElementById("log-stream"),
+    
+    // Language & STT
+    languageSelect: document.getElementById("language-select"),
+    sttModeBtn: document.getElementById("stt-mode"),
+    
+    // API Keys
+    sarvamKey: document.getElementById("sarvam-key"),
+    openaiKey: document.getElementById("openai-key"),
+    openaiModel: document.getElementById("openai-model"),
+    saveSarvamBtn: document.getElementById("save-sarvam"),
+    
+    // Image generation
+    imageReceptor: document.getElementById("image-receptor"),
+    imageStatus: document.getElementById("image-status"),
+    generatedImage: document.getElementById("generated-image"),
+    
+    // Time display
+    quantumTime: document.getElementById("quantum-time")
+};
+
+// ===== STATE VARIABLES =====
+let lastDetectedLanguage = "en";
+let mediaRecorder = null;
+let audioChunks = [];
+let micStream = null;
+let replyAudio = null;
+let lastReplyText = "";
+let lastReplyLang = "en";
+let audioUnlocked = false;
+let pendingAutoPlay = false;
+let pendingText = "";
+let pendingLang = "en";
+let sttBatchInFlight = false;
+
+// ===== UTILITY FUNCTIONS =====
+
+// Update core state display
+function setCoreState(state, subtitle = "") {
+    if (elements.coreState) {
+        elements.coreState.textContent = state.toUpperCase();
+    }
+    if (elements.consciousnessStream && subtitle) {
+        elements.consciousnessStream.textContent = `"${subtitle}"`;
+    } else if (elements.consciousnessStream) {
+        elements.consciousnessStream.textContent = `"system is ${state.toLowerCase()}"`;
+    }
+}
+
+// Get selected language
+function getSelectedLang() {
+    if (!elements.languageSelect) return "en";
+    const v = elements.languageSelect.value;
+    return v === "hi" || v === "mr" || v === "en" ? v : "en";
+}
+
+// Load saved language preference
+function loadSavedLanguage() {
+    try {
+        const saved = localStorage.getItem("orion_language");
+        if (saved && ["en", "hi", "mr"].includes(saved) && elements.languageSelect) {
+            elements.languageSelect.value = saved;
+            lastDetectedLanguage = saved;
+        }
+    } catch (e) {
+        console.warn("Could not load language preference", e);
+    }
+}
+
+// Save language preference
+function persistLanguage(lang) {
+    try {
+        localStorage.setItem("orion_language", lang);
+    } catch (e) {
+        console.warn("Could not save language preference", e);
+    }
+}
+
+// Update time display
+function updateTime() {
+    if (elements.quantumTime) {
+        const now = new Date();
+        elements.quantumTime.textContent = now.toLocaleTimeString('en-GB', {
+            hour: '2-digit',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: false
+        });
+    }
+}
+setInterval(updateTime, 1000);
+updateTime();
+
+// ===== AUDIO HANDLING =====
+
+// Unlock audio on user interaction
+function unlockAudio() {
+    if (audioUnlocked) return;
+    try {
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (AudioContext) {
+            const ctx = new AudioContext();
+            if (ctx.state === "suspended") ctx.resume();
+            // Silent oscillator to unlock audio
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+            gain.gain.value = 0.0001;
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+            osc.start();
+            osc.stop(ctx.currentTime + 0.01);
+        }
+        audioUnlocked = true;
+    } catch (e) {
+        console.warn("Audio unlock failed", e);
+        audioUnlocked = true;
+    }
+}
+
+// Map language to TTS voice
+function mapLangToTts(lang) {
+    const code = (lang || "").toLowerCase();
+    if (code.startsWith("hi")) return { language_code: "hi-IN", speaker: "priya" };
+    if (code.startsWith("mr")) return { language_code: "mr-IN", speaker: "shruti" };
+    return { language_code: "en-IN", speaker: "amelia" };
+}
+
+// Play TTS reply
+async function playReplyTTS(text, langCode) {
+    if (!text || !text.trim()) return;
+    
+    lastReplyText = text;
+    lastReplyLang = langCode || lastDetectedLanguage || "en";
+    
+    const { language_code, speaker } = mapLangToTts(langCode || lastDetectedLanguage);
+    
+    const formData = new FormData();
+    formData.append("text", text);
+    formData.append("language_code", language_code);
+    formData.append("speaker", speaker);
+    
+    try {
+        setCoreState("speaking", "neural vocalization active");
+        pendingAutoPlay = false;
+        
+        const response = await fetch(`${API_BASE}/tts`, {
+            method: "POST",
+            body: formData
+        });
+        
+        if (!response.ok) throw new Error(`TTS failed: ${response.status}`);
+        
+        const blob = await response.blob();
+        
+        if (replyAudio) {
+            replyAudio.pause();
+            URL.revokeObjectURL(replyAudio.src);
+        }
+        
+        replyAudio = new Audio(URL.createObjectURL(blob));
+        await replyAudio.play();
+        setCoreState("idle", "awaiting neural input");
+        
+    } catch (e) {
+        console.error("TTS error:", e);
+        setCoreState("idle", "audio system ready");
+        pendingAutoPlay = true;
+        pendingText = text;
+        pendingLang = lastReplyLang;
+    }
+}
+
+// Skip TTS for replies that contain links/URLs (annoying to speak long URLs).
+function containsUrl(text) {
+  const t = (text || "").trim();
+  if (!t) return false;
+  return /(https?:\/\/|www\.)\S+/i.test(t);
+}
+
+// ===== MESSAGE HANDLING =====
+
+// Append message to log
+function appendMessage(role, text) {
+    if (!elements.logStream) return;
+    
+    const entry = document.createElement("div");
+    entry.className = `log-entry ${role}`;
+    
+    const timestamp = document.createElement("span");
+    timestamp.className = "log-timestamp";
+    timestamp.textContent = new Date().toLocaleTimeString('en-GB', {
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: false
+    });
+    
+    const message = document.createElement("span");
+    message.className = "log-message";
+    message.textContent = text;
+    
+    entry.appendChild(timestamp);
+    entry.appendChild(message);
+    
+    elements.logStream.appendChild(entry);
+    elements.logStream.scrollTop = elements.logStream.scrollHeight;
+}
+
+// Send message to chat API
+async function sendMessage(text, langOverride) {
+    if (!text.trim()) return;
+    
+    appendMessage("user", text);
+    if (elements.userInput) elements.userInput.value = "";
+    
+    setCoreState("thinking", "processing neural patterns...");
+    
+    const language = langOverride || getSelectedLang() || "en";
+    
+    // Check for image generation request
+    const lower = text.toLowerCase();
+    const isImageRequest = 
+        (lower.includes("image") && lower.includes("generate")) ||
+        (lower.includes("create") && lower.includes("image")) ||
+        (lower.includes("draw") && lower.includes("image")) ||
+        lower.includes("make an image") ||
+        lower.includes("generate image");
+    
+    if (isImageRequest) {
+        // Extract prompt
+        let prompt = text;
+        const patterns = [
+            /generate\s+(?:an?\s+)?image\s+(?:of\s+)?(.*)/i,
+            /create\s+(?:an?\s+)?image\s+(?:of\s+)?(.*)/i,
+            /draw\s+(?:an?\s+)?image\s+(?:of\s+)?(.*)/i,
+            /image\s+of\s+(.*)/i
+        ];
+        
+        for (const pattern of patterns) {
+            const match = text.match(pattern);
+            if (match && match[1]) {
+                prompt = match[1].trim();
+                break;
+            }
+        }
+        
+        try {
+            if (elements.imageStatus) {
+                elements.imageStatus.textContent = "Generating neural visualization...";
+            }
+            
+            if (elements.generatedImage) {
+                elements.generatedImage.src = "";
+                elements.generatedImage.style.display = "none";
+            }
+            
+            const formData = new FormData();
+            formData.append("prompt", prompt);
+            
+            const response = await fetch(`${API_BASE}/image/generate`, {
+                method: "POST",
+                body: formData
+            });
+            
+            const data = await response.json();
+            
+            if (!response.ok) {
+                throw new Error(data.detail || `Image generation failed (${response.status})`);
+            }
+            
+            if (data.image_data_url && elements.generatedImage) {
+                elements.generatedImage.src = data.image_data_url;
+                elements.generatedImage.style.display = "block";
+                
+                if (elements.imageReceptor) {
+                    elements.imageReceptor.classList.add("has-image");
+                }
+            }
+            
+            if (elements.imageStatus) {
+                elements.imageStatus.textContent = "Neural visualization complete";
+            }
+            
+            const confirmText = language.startsWith("hi") 
+                ? "छवि तैयार है।" 
+                : language.startsWith("mr") 
+                    ? "प्रतिमा तयार आहे." 
+                    : "Neural visualization complete.";
+            
+            appendMessage("ai", confirmText);
+            if (!containsUrl(confirmText)) {
+                await playReplyTTS(confirmText, language);
+            }
+            
+        } catch (e) {
+            console.error("Image generation error:", e);
+            const errorMsg = e.message || "Failed to generate image";
+            if (elements.imageStatus) elements.imageStatus.textContent = errorMsg;
+            appendMessage("ai", `⚠️ ${errorMsg}`);
+        }
+        
+        return;
+    }
+    
+    // Regular chat message
+    const formData = new FormData();
+    formData.append("message", text);
+    formData.append("language", language);
+    
+    try {
+        const response = await fetch(`${API_BASE}/chat`, {
+            method: "POST",
+            body: formData
+        });
+        
+        const data = await response.json();
+        
+        if (!response.ok) {
+            throw new Error(data.detail || `Chat failed (${response.status})`);
+        }
+        
+        const replyText = data.text || "[No response]";
+        appendMessage("ai", replyText);
+        if (!containsUrl(replyText)) {
+            await playReplyTTS(replyText, language);
+        }
+        
+    } catch (e) {
+        console.error("Chat error:", e);
+        appendMessage("ai", "⚠️ Neural link failed. Check connection.");
+        setCoreState("idle", "connection error");
+    }
+}
+
+// ===== SPEECH-TO-TEXT HANDLING =====
+
+async function startSTTRecording() {
+    if (sttBatchInFlight) return;
+    
+    sttBatchInFlight = true;
+    audioChunks = [];
+    
+    try {
+        if (!micStream) {
+            micStream = await navigator.mediaDevices.getUserMedia({ 
+                audio: {
+                    echoCancellation: true,
+                    noiseSuppression: true,
+                    autoGainControl: true
+                }
+            });
+        }
+        
+        mediaRecorder = new MediaRecorder(micStream, {
+            mimeType: 'audio/webm;codecs=opus'
+        });
+        
+        mediaRecorder.ondataavailable = (e) => {
+            if (e.data && e.data.size > 0) {
+                audioChunks.push(e.data);
+            }
+        };
+        
+        mediaRecorder.onstop = async () => {
+            const lang = getSelectedLang();
+            
+            try {
+                setCoreState("thinking", "decoding neural patterns...");
+                
+                const blob = new Blob(audioChunks, { type: "audio/webm" });
+                
+                if (blob.size < 1000) {
+                    setCoreState("idle", "no input detected");
+                    sttBatchInFlight = false;
+                    return;
+                }
+                
+                const formData = new FormData();
+                formData.append("audio", blob, "speech.webm");
+                formData.append("language_hint", lang);
+                
+                const response = await fetch(`${API_BASE}/stt`, {
+                    method: "POST",
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.detail || `STT failed (${response.status})`);
+                }
+                
+                const text = data.text || "";
+                const detected = (data.detected_language || lang || "en").slice(0, 2);
+                lastDetectedLanguage = detected;
+                
+                if (elements.userInput) {
+                    elements.userInput.value = text;
+                }
+                
+                if (elements.consciousnessStream) {
+                    elements.consciousnessStream.textContent = `"${text || '...'}"`;
+                }
+                
+                if (text) {
+                    await sendMessage(text, detected);
+                } else {
+                    setCoreState("idle", "no speech detected");
+                }
+                
+            } catch (e) {
+                console.error("STT error:", e);
+                setCoreState("idle", "neural decoding failed");
+            } finally {
+                sttBatchInFlight = false;
+            }
+        };
+        
+        mediaRecorder.start();
+        setCoreState("listening", "neural input active - release to process");
+        
+    } catch (e) {
+        console.error("Mic access error:", e);
+        setCoreState("idle", "mic access denied");
+        sttBatchInFlight = false;
+    }
+}
+
+function stopSTTRecording() {
+    try {
+        if (mediaRecorder && mediaRecorder.state === "recording") {
+            setCoreState("thinking", "processing neural input");
+            mediaRecorder.stop();
+            
+            // Stop tracks to release mic
+            if (micStream) {
+                micStream.getTracks().forEach(track => track.stop());
+                micStream = null;
+            }
+        } else {
+            sttBatchInFlight = false;
+        }
+    } catch (e) {
+        console.error("Stop recording error:", e);
+        sttBatchInFlight = false;
+    }
+}
+
+// ===== API KEY HANDLING =====
+
+async function saveKeysToBackend() {
+    const sarvamKey = elements.sarvamKey?.value.trim() || "";
+    const openaiKey = elements.openaiKey?.value.trim() || "";
+    const openaiModel = elements.openaiModel?.value.trim() || "gpt-4o";
+    
+    try {
+        const formData = new FormData();
+        formData.append("sarvam_api_key", sarvamKey);
+        formData.append("cloud_provider", "openai_compatible");
+        formData.append("cloud_api_key", openaiKey);
+        formData.append("cloud_base_url", "https://api.openai.com");
+        formData.append("cloud_model", openaiModel);
+        
+        const response = await fetch(`${API_BASE}/config`, {
+            method: "POST",
+            body: formData
+        });
+        
+        if (!response.ok) throw new Error("Failed to save configuration");
+        
+        // Save to localStorage
+        localStorage.setItem("sarvam_api_key", sarvamKey);
+        localStorage.setItem("openai_api_key", openaiKey);
+        localStorage.setItem("openai_model", openaiModel);
+        
+        // Show success
+        appendMessage("system", "API keys stored in quantum vault");
+        
+    } catch (e) {
+        console.error("Failed to save API keys:", e);
+        appendMessage("system", "⚠️ Failed to save API keys to backend");
+    }
+}
+
+// Load saved API keys
+function loadSavedKeys() {
+    try {
+        const sarvamKey = localStorage.getItem("sarvam_api_key");
+        const openaiKey = localStorage.getItem("openai_api_key");
+        const openaiModel = localStorage.getItem("openai_model");
+        
+        if (sarvamKey && elements.sarvamKey) {
+            elements.sarvamKey.value = sarvamKey;
+        }
+        
+        if (openaiKey && elements.openaiKey) {
+            elements.openaiKey.value = openaiKey;
+        }
+        
+        if (openaiModel && elements.openaiModel) {
+            elements.openaiModel.value = openaiModel;
+        }
+        
+    } catch (e) {
+        console.warn("Could not load saved keys:", e);
+    }
+}
+
+// ===== EVENT LISTENERS =====
+
+// Send button
+if (elements.sendBtn) {
+    elements.sendBtn.addEventListener("click", () => {
+        unlockAudio();
+        if (elements.userInput?.value.trim()) {
+            sendMessage(elements.userInput.value);
+        }
+    });
+}
+
+// Mic button - push to talk
+if (elements.micBtn) {
+    elements.micBtn.addEventListener("mousedown", (e) => {
+        e.preventDefault();
+        unlockAudio();
+        startSTTRecording();
+    });
+    
+    elements.micBtn.addEventListener("mouseup", stopSTTRecording);
+    elements.micBtn.addEventListener("mouseleave", stopSTTRecording);
+}
+
+// Enter key in textarea
+if (elements.userInput) {
+    elements.userInput.addEventListener("keydown", (e) => {
+        unlockAudio();
+        if (e.key === "Enter" && !e.shiftKey) {
+            e.preventDefault();
+            if (elements.userInput.value.trim()) {
+                sendMessage(elements.userInput.value);
+            }
+        }
+    });
+}
+
+// Clear log
+if (elements.clearLog) {
+    elements.clearLog.addEventListener("click", () => {
+        if (elements.logStream) {
+            elements.logStream.innerHTML = "";
+            appendMessage("system", "Memory log cleared");
+        }
+    });
+}
+
+// Language select
+if (elements.languageSelect) {
+    loadSavedLanguage();
+    elements.languageSelect.addEventListener("change", () => {
+        const lang = getSelectedLang();
+        persistLanguage(lang);
+        lastDetectedLanguage = lang;
+        if (elements.consciousnessStream) {
+            const langNames = { en: "English", hi: "Hindi", mr: "Marathi" };
+            elements.consciousnessStream.textContent = `"language: ${langNames[lang]}"`;
+        }
+    });
+}
+
+// Save API keys
+if (elements.saveSarvamBtn) {
+    elements.saveSarvamBtn.addEventListener("click", saveKeysToBackend);
+}
+
+// STT mode toggle (just visual for now)
+if (elements.sttModeBtn) {
+    elements.sttModeBtn.addEventListener("click", () => {
+        const modes = ["SARVAM", "BATCH", "REALTIME"];
+        const current = elements.sttModeBtn.textContent;
+        const nextIndex = (modes.indexOf(current) + 1) % modes.length;
+        elements.sttModeBtn.textContent = modes[nextIndex];
+    });
+}
+
+// ===== INITIALIZATION =====
+
+// Load saved keys
+loadSavedKeys();
+
+// Set initial state
+setCoreState("idle", "neural interface initialized");
+
+// Add welcome message
+appendMessage("system", "ORION neural interface v3.1.0 initialized");
+appendMessage("ai", "Awaiting your command. All systems operational.");
+
+// Clean up on page unload
+window.addEventListener("beforeunload", () => {
+    if (micStream) {
+        micStream.getTracks().forEach(track => track.stop());
+    }
+    if (replyAudio) {
+        replyAudio.pause();
+        URL.revokeObjectURL(replyAudio.src);
+    }
+});
+    </script>
 </body>
 </html>

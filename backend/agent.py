@@ -23,6 +23,8 @@ from tools.shell_tools import shell_run_tool
 from tools.system_tools import system_open_tool
 from tools.find_tools import system_find_app_tool, system_find_tool
 
+from audio_service import mute_microphone, mute_speaker, set_speaker_volume_scalar
+
 logger = logging.getLogger("orion-backend")
 
 
@@ -86,6 +88,7 @@ def run_agent(text: str, language: str | None = None) -> Dict[str, Any]:
         "\n- If a tool returns 'No results found.' or errors, say you could not retrieve results; do not make up sources."
         "\n- If the user asks for N items, you MUST return N items in FINAL."
         "\n- For informational answers, include links only under a 'Sources:' section (max 1-3). Do NOT output only URLs."
+        "\n- If the user's request clearly contains multiple intents/steps (e.g., contains 'and', 'then', 'after', 'plus', or multiple verbs like open/play/search), you MUST complete each step using ACTION/tool calls before outputting FINAL."
         "\n- Keep answers concise."
     )
 
@@ -93,6 +96,7 @@ def run_agent(text: str, language: str | None = None) -> Dict[str, Any]:
     cloud_provider = (get_cloud_provider() or "").lower()
 
     lower_q = text.lower()
+    skip_youtube_results_open = ("youtube" in lower_q) and ("search" in lower_q)
 
     # Fast-path: greetings / acknowledgements should never trigger web search or tools.
     # This avoids cases where local LLM outputs ACTION:web_search for "hello".
@@ -123,6 +127,113 @@ def run_agent(text: str, language: str | None = None) -> Dict[str, Any]:
         if (language or "en").lower().startswith("mr"):
             return {"output": "नमस्कार! मी Orion आहे. तुम्हाला काय करायचं आहे?"}
         return {"output": "Hi! I’m Orion. What can I help you with?"}
+
+    # Fast-path: audio controls (no LLM tool loop needed).
+    def _try_audio_control() -> Optional[Dict[str, Any]]:
+        lang = (language or "en").lower()
+
+        mic_keywords = ("mic", "microphone", "mike", "audio input", "input mic")
+        speaker_keywords = ("speaker", "system volume", "volume", "sound", "output")
+
+        def _has_any(needles: tuple[str, ...], hay: str) -> bool:
+            return any(n in hay for n in needles)
+
+        is_mic_request = _has_any(mic_keywords, lower_q)
+        wants_mute = "mute" in lower_q and "unmute" not in lower_q
+        wants_unmute = "unmute" in lower_q or ("unmuted" in lower_q)
+
+        # Microphone mute/unmute
+        if is_mic_request and (wants_mute or wants_unmute):
+            try:
+                mute_microphone(wants_mute)
+                if lang.startswith("hi"):
+                    return {"output": "माइक्रोफ़ोन म्यूट कर दिया गया।" if wants_mute else "माइक्रोफ़ोन अनम्यूट कर दिया गया।"}
+                if lang.startswith("mr"):
+                    return {"output": "मायक्रोफोन म्यूट केला आहे." if wants_mute else "मायक्रोफोन अनम्यूट केला आहे."}
+                return {"output": "Microphone muted." if wants_mute else "Microphone unmuted."}
+            except Exception as e:
+                if lang.startswith("hi"):
+                    return {"output": f"माफ़ कीजिए, मैं माइक्रोफ़ोन बदल नहीं पाया: {e}"}
+                if lang.startswith("mr"):
+                    return {"output": f"माफ करा, मी मायक्रोफोन बदलू शकलो नाही: {e}"}
+                return {"output": f"Sorry, I couldn't control the microphone: {e}"}
+
+        # Speaker volume / mute
+        is_volume_request = _has_any(speaker_keywords, lower_q) and ("volume" in lower_q or "sound" in lower_q or "speaker" in lower_q)
+
+        if is_volume_request:
+            # mute/unmute speaker
+            if wants_mute or wants_unmute:
+                try:
+                    mute_speaker(wants_mute)
+                    if lang.startswith("hi"):
+                        return {"output": f"सिस्टम वॉल्यूम {'म्यूट' if wants_mute else 'अनम्यूट'} कर दिया गया।"}
+                    if lang.startswith("mr"):
+                        return {"output": f"सिस्टम व्हॉल्यूम {'म्यूट' if wants_mute else 'अनम्यूट'} केला आहे."}
+                    return {"output": f"System volume {'muted' if wants_mute else 'unmuted'}."}
+                except Exception as e:
+                    if lang.startswith("hi"):
+                        return {"output": f"माफ़ कीजिए, मैं सिस्टम वॉल्यूम बदल नहीं पाया: {e}"}
+                    if lang.startswith("mr"):
+                        return {"output": f"माफ करा, मी सिस्टम व्हॉल्यूम बदलू शकलो नाही: {e}"}
+                    return {"output": f"Sorry, I couldn't control system volume: {e}"}
+
+            # set volume low/high or a percentage
+            target_scalar: Optional[float] = None
+            # explicit "to low/high"
+            m = None
+            try:
+                m = __import__("re").search(r"\bto\s+(low|high)\b", lower_q)
+            except Exception:
+                m = None
+
+            choice = None
+            if m:
+                choice = m.group(1).lower()
+            elif ("low" in lower_q) or ("high" in lower_q):
+                # Prefer whichever word appears closer to "volume"
+                if "high" in lower_q and "low" in lower_q:
+                    # crude heuristic: if "high" appears after "volume", use high; otherwise low
+                    choice = "high" if lower_q.find("high", lower_q.find("volume")) != -1 else "low"
+                elif "high" in lower_q:
+                    choice = "high"
+                else:
+                    choice = "low"
+
+            if choice == "high":
+                target_scalar = 0.8
+            elif choice == "low":
+                target_scalar = 0.2
+
+            # Percentage override (e.g. "volume to 30")
+            pm = __import__("re").search(r"\bvolume\b[^0-9]*(\d{1,3})\s*%?\b", lower_q)
+            if pm:
+                pct = int(pm.group(1))
+                pct = max(0, min(100, pct))
+                target_scalar = pct / 100.0
+
+            if target_scalar is not None:
+                try:
+                    set_speaker_volume_scalar(target_scalar)
+                    pct_out = int(round(target_scalar * 100))
+                    if lang.startswith("hi"):
+                        return {"output": f"सिस्टम वॉल्यूम {pct_out}% पर सेट कर दिया गया।"}
+                    if lang.startswith("mr"):
+                        return {"output": f"सिस्टम व्हॉल्यूम {pct_out}% वर सेट केला आहे."}
+                    return {"output": f"System volume set to {pct_out}%."}
+                except Exception as e:
+                    if lang.startswith("hi"):
+                        return {"output": f"माफ़ कीजिए, मैं सिस्टम वॉल्यूम बदल नहीं पाया: {e}"}
+                    if lang.startswith("mr"):
+                        return {"output": f"माफ करा, मी सिस्टम व्हॉल्यूम बदलू शकलो नाही: {e}"}
+                    return {"output": f"Sorry, I couldn't control system volume: {e}"}
+
+        return None
+
+    audio_res = _try_audio_control()
+    if audio_res is not None:
+        return audio_res
+
     # Router: local-system tasks should be planned/executed by the local Ollama model.
     # This reduces “I can't access your files” refusal patterns with cloud models.
     local_task = any(
@@ -547,7 +658,7 @@ def run_agent(text: str, language: str | None = None) -> Dict[str, Any]:
     # Deterministic fast-path for opening apps/urls/files.
     # Examples: "open calculator", "launch chrome", "open https://...", "open Documents/notes.txt"
     # Avoid interfering with create+write+open requests (handled above).
-    if re.search(r"\b(open|launch|start)\b", lower_q) and not (
+    if re.search(r"\b(open|launch|start)\b", lower_q) and not re.search(r"\b(play|youtube|song)\b", lower_q) and not (
         re.search(r"\b(create|make|mkdir)\b", lower_q)
         and re.search(r"\b(folder|directory|dir)\b", lower_q)
         and re.search(r"\b(write|save|edit|update file)\b", lower_q)
@@ -673,6 +784,21 @@ def run_agent(text: str, language: str | None = None) -> Dict[str, Any]:
             return str(web_search_tool.invoke({"query": tool_input}))
         if action == "system_open":
             # Tool expects {"target": "..."}
+            # Avoid extra tabs: don't open YouTube search results pages; open only final video links.
+            target = (tool_input or "").strip()
+            t = target.lower()
+            if skip_youtube_results_open and (
+                (t.startswith("http://") or t.startswith("https://"))
+                and ("youtube.com" in t or "youtu.be" in t)
+                and (
+                    ("youtube.com/results" in t)
+                    or ("youtube.com/search" in t)
+                    or ("search_query=" in t)
+                )
+                and ("watch" not in t)
+                and ("youtu.be/" not in t)
+            ):
+                return f"Skipped opening YouTube search results page to avoid multiple tabs: {target}"
             return str(system_open_tool.invoke({"target": tool_input}))
         if action == "system_find":
             # Tool expects {"name": "..."}
@@ -721,7 +847,24 @@ def run_agent(text: str, language: str | None = None) -> Dict[str, Any]:
     scratchpad = ""
     user_msg = f"User ({lang}): {text}"
 
-    max_steps = 8
+    def _compute_min_actions(q: str) -> int:
+        ql = (q or "").lower()
+        and_count = len(re.findall(r"\b(and|then|after|plus)\b", ql))
+        verb_needles = ["open", "launch", "start", "search", "find", "play", "watch", "click", "type"]
+        verb_count = sum(1 for v in verb_needles if v in ql)
+        # Baseline: 1 tool step.
+        min_a = 1
+        if and_count:
+            min_a = 1 + and_count
+        if verb_count > 1:
+            min_a = max(min_a, verb_count - 1)
+        # Clamp runtime.
+        return max(1, min(8, min_a))
+
+    min_actions = _compute_min_actions(text)
+
+    max_steps = 15
+    actions_done = 0
     for _ in range(max_steps):
         prompt = (
             f"{system_hint}\n\n"
@@ -739,6 +882,12 @@ def run_agent(text: str, language: str | None = None) -> Dict[str, Any]:
                     "format 'Topic — <link>'. Try again.\n"
                 )
                 continue
+            if actions_done < min_actions:
+                scratchpad += (
+                    f"\nOBSERVATION: Multi-step request detected; only {actions_done} tool actions were completed, "
+                    f"but at least {min_actions} actions are expected. Continue with more ACTION/tool calls before FINAL.\n"
+                )
+                continue
             return {"output": final}
 
         if not action:
@@ -752,6 +901,7 @@ def run_agent(text: str, language: str | None = None) -> Dict[str, Any]:
             observation = f"ERROR running {action}: {e}"
 
         scratchpad += f"\nACTION: {action}\nINPUT: {tool_input}\nOBSERVATION: {observation}\n"
+        actions_done += 1
 
     return {"output": "I couldn't complete the task within the tool step limit."}
 

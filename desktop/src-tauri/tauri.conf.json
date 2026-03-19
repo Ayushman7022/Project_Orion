@@ -3,9 +3,9 @@
   "productName": "ORION",
   "version": "0.1.0",
   "build": {
-    "beforeDevCommand": "python -m http.server 1420 --bind 127.0.0.1 --directory C:\\Users\\Ayushman\\Desktop\\Sid\\frontend",
+    "beforeDevCommand": "npm run serve-frontend",
     "beforeBuildCommand": "",
-    "frontendDist": "C:\\Users\\Ayushman\\Desktop\\Sid\\frontend",
+    "frontendDist": "../../frontend",
     "devUrl": "http://127.0.0.1:1420"
   },
   "app": {
@@ -14,7 +14,9 @@
         "title": "ORION // Local Assistant",
         "width": 1200,
         "height": 760,
-        "resizable": true
+        "resizable": true,
+        "devtools": true,
+        "additionalBrowserArgs": "--disable-features=msWebOOUI,msPdfOOUI,msSmartScreenProtection --disable-http-cache"
       }
     ],
     "security": {
