@@ -266,8 +266,8 @@ async function sendMessage(text, langOverride) {
             }
             
             if (elements.generatedImage) {
-                elements.generatedImage.classList.remove("show");
                 elements.generatedImage.src = "";
+                elements.generatedImage.style.display = "none";
             }
             
             const formData = new FormData();
@@ -284,9 +284,20 @@ async function sendMessage(text, langOverride) {
                 throw new Error(data.detail || `Image generation failed (${response.status})`);
             }
             
-            if (elements.generatedImage && data.image_data_url) {
-                elements.generatedImage.src = data.image_data_url;
-                elements.generatedImage.classList.add("show");
+            if (data.image_data_url) {
+                // Some UI variants use different classes; enforce visibility via inline style.
+                const imgs = document.querySelectorAll("#generated-image");
+                if (imgs && imgs.length) {
+                    imgs.forEach((img) => {
+                        if (img) {
+                            img.src = data.image_data_url;
+                            img.style.display = "block";
+                        }
+                    });
+                } else if (elements.generatedImage) {
+                    elements.generatedImage.src = data.image_data_url;
+                    elements.generatedImage.style.display = "block";
+                }
                 elements.imageReceptor?.classList.add("has-image");
             }
             

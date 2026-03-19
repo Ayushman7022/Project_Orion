@@ -78,13 +78,14 @@ def run_agent(text: str, language: str | None = None) -> Dict[str, Any]:
         "\n- shell_run: run safe read-only shell commands (dir, git status, pip list, etc.)"
         "\n\nRules:"
         "\n- If user asks for current/trending/latest or asks for sources/links, use ACTION: web_search."
+        "\n- For factual/informational questions, use web_crawl and respond with a short summary (not a raw list of URLs)."
         "\n- If user asks to open/launch/start an app/website/file, use ACTION: system_open."
         "\n- If user asks to find/locate a file on the whole PC, use ACTION: system_find."
         "\n- If user asks to find an app/program, use ACTION: system_find_app."
         "\n- Never claim you read/edited files unless you used fs_* tools."
         "\n- If a tool returns 'No results found.' or errors, say you could not retrieve results; do not make up sources."
         "\n- If the user asks for N items, you MUST return N items in FINAL."
-        "\n- In FINAL, use this format for lists: 'Topic — <link>' (one per line)."
+        "\n- For informational answers, include links only under a 'Sources:' section (max 1-3). Do NOT output only URLs."
         "\n- Keep answers concise."
     )
 
@@ -301,6 +302,81 @@ def run_agent(text: str, language: str | None = None) -> Dict[str, Any]:
             return {"output": out}
         except Exception as e:
             return {"output": f"I could not crawl and summarize the links: {e}"}
+
+    # Deterministic fast-path for general "tell/give information about" summaries.
+    # This fixes the common failure mode where the agent returns only links instead of a summary.
+    has_info_request = any(
+        k in lower_q
+        for k in [
+            "information",
+            "infomation",
+            "info:",
+            "info ",
+            "summary",
+            "summarize",
+            "summarise",
+            "explain",
+            "overview",
+            "tell me",
+            "give me",
+            "mujhe",
+            # Common Devanagari variants you may speak:
+            "जानकारी",
+            "इन्फॉर्मेशन",
+            "इन्फोर्मेशन",
+            "इन्फर्मेशन",
+            "बताओ",
+            "बारे में",
+            "के बारे में",
+        ]
+    )
+    if has_info_request and not local_task:
+        try:
+            crawled = str(web_crawl_tool.invoke({"query": text}))
+            urls = re.findall(r"^URL:\s*(\S+)$", crawled, flags=re.MULTILINE)
+
+            lang_name = "English"
+            if (lang or "").lower().startswith("hi"):
+                lang_name = "Hindi"
+            elif (lang or "").lower().startswith("mr"):
+                lang_name = "Marathi"
+
+            summary_system = (
+                f"You are ORION. Respond in {lang_name}. Create a clear, concise summary using the provided extracted web text. "
+                "Return ONLY the summary (no ACTION/INPUT, no JSON)."
+            )
+            summary_prompt = (
+                f"User question: {text}\n\n"
+                f"Extracted web content (may be partial):\n{crawled}\n\n"
+                "Write a short summary (6-10 bullet points) and a final 1-line takeaway."
+            )
+
+            out = _llm_text(summary_prompt, system_override=summary_system).strip()
+            if urls:
+                sources = "\n".join([f"- {u}" for u in urls[:3]])
+                out = out + "\n\nSources:\n" + sources
+            return {"output": out}
+        except Exception:
+            # Fallback: summarize from search snippets (smaller input than crawling full pages).
+            try:
+                ws = str(web_search_tool.invoke({"query": text}))
+                lang_name = "English"
+                if (lang or "").lower().startswith("hi"):
+                    lang_name = "Hindi"
+                elif (lang or "").lower().startswith("mr"):
+                    lang_name = "Marathi"
+                fallback_system = (
+                    f"You are ORION. Respond in {lang_name}. Summarize the information from these search results. "
+                    "Do NOT output only URLs. Provide a concise summary."
+                )
+                out = _llm_text(
+                    f"User question: {text}\n\nSearch results:\n{ws}\n\n"
+                    "Write a short summary (5-8 bullet points) and a final takeaway.",
+                    system_override=fallback_system,
+                ).strip()
+                return {"output": out}
+            except Exception as e:
+                return {"output": f"Could not retrieve information: {e}"}
 
     # Deterministic fast-path for "search my files / find in files" requests.
     # This makes it Cursor-like even if the model doesn't choose fs_search.
